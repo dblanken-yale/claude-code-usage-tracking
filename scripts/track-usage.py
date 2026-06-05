@@ -54,6 +54,9 @@ CSV_PATH = os.path.join(USAGE_DIR, "usage.csv")
 STATE_PATH = os.path.join(USAGE_DIR, ".state.json")
 SEEN_PATH = os.path.join(USAGE_DIR, ".seen_ids")
 LOCK_PATH = os.path.join(USAGE_DIR, ".lock")
+# Wherever this script ends up installed, it records its own absolute path here so
+# the slash command / CLI can find it without anyone hardcoding an install location.
+SELF_PATH_FILE = os.path.join(USAGE_DIR, ".script_path")
 PROJECTS_GLOB = os.path.expanduser("~/.claude/projects/*/*.jsonl")
 
 FIELDS = [
@@ -159,6 +162,17 @@ def load_seen():
             return {line.strip() for line in f if line.strip()}
     except FileNotFoundError:
         return set()
+
+
+def record_self():
+    """Record this script's absolute path so the CLI/slash command can locate it
+    regardless of where the plugin was installed (no hardcoded paths anywhere)."""
+    try:
+        os.makedirs(USAGE_DIR, exist_ok=True)
+        with open(SELF_PATH_FILE, "w") as f:
+            f.write(os.path.abspath(__file__))
+    except OSError:
+        pass
 
 
 def process(path, state, writer, seen, seen_fh):
@@ -332,6 +346,7 @@ def main():
                         help="Monthly subscription price for the breakeven verdict")
     args = parser.parse_args()
 
+    record_self()
     if args.report:
         report(month=args.month, sub_cost=args.sub_cost)
     elif args.scan_all:

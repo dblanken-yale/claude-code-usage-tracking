@@ -32,49 +32,64 @@ are costed correctly even when the main session is on Opus.
 
 ## Install
 
+In Claude Code:
+
 ```
-/plugin marketplace add <your-github-username>/claude-code-usage-tracking
+/plugin marketplace add dblanken-yale/claude-code-usage-tracking
 /plugin install claude-code-usage-tracker@usage-tracker-marketplace
 ```
 
 Enabling the plugin auto-registers its `Stop` and `SessionEnd` hooks — no manual
-settings edits. From then on, every session is logged.
+settings edits, no paths to configure. From then on, every session is logged to
+`~/.claude/usage/usage.csv`. Nothing in the plugin is hardcoded to a particular
+machine: data goes under your own home directory, and the script is found via
+`${CLAUDE_PLUGIN_ROOT}` wherever Claude Code installs it.
 
-To test locally before publishing, add the marketplace from the local path:
+To test locally before publishing, add the marketplace from the directory you cloned
+into (any path works):
 
 ```
-/plugin marketplace add ~/code/claude-code-usage-tracking
+/plugin marketplace add /path/to/your/clone/claude-code-usage-tracking
 /plugin install claude-code-usage-tracker@usage-tracker-marketplace
 ```
 
 ## Usage
 
-### Backfill your history
+### Report (easiest — no paths)
 
-Ingest every existing transcript on disk (safe to re-run — it never double-counts):
+Run the bundled slash command in any session:
 
 ```
-python3 ~/code/claude-code-usage-tracking/scripts/track-usage.py --scan-all
+/usage-report
+/usage-report 2026-06 200
 ```
 
-This also sweeps up subagent/team transcripts that live in separate files.
+It prints totals, caching savings, per-model and per-project breakdowns, average
+cost per session/turn/day, a 30-day run-rate, and — when you pass a subscription
+price — a subscription-vs-API breakeven verdict.
 
-### Analyze
+### Analyze in a spreadsheet
 
 Open `~/.claude/usage/usage.csv` in Excel / Sheets and pivot on `date`, `model`,
 `project`, or `session_id`. Sum `cost_usd` for your API-equivalent spend.
 
-### ROI report
+### Command line
+
+The script records its own location on every run, so you never need to know where
+the plugin lives:
 
 ```
-python3 ~/code/claude-code-usage-tracking/scripts/track-usage.py --report
-python3 ~/code/claude-code-usage-tracking/scripts/track-usage.py --report --month 2026-06
-python3 ~/code/claude-code-usage-tracking/scripts/track-usage.py --report --sub-cost 200
+python3 "$(cat ~/.claude/usage/.script_path)" --report
+python3 "$(cat ~/.claude/usage/.script_path)" --report --month 2026-06
+python3 "$(cat ~/.claude/usage/.script_path)" --report --sub-cost 200
+python3 "$(cat ~/.claude/usage/.script_path)" --scan-all
 ```
 
-Prints totals, caching savings, per-model and per-project breakdowns, average
-cost per session/turn/day, a 30-day run-rate, and — with `--sub-cost` — a
-subscription-vs-API breakeven verdict.
+`--scan-all` ingests every existing transcript on disk (safe to re-run — it never
+double-counts), backfilling history and sweeping up subagent/team transcripts that
+live in separate files. (`.script_path` is written the first time any hook fires; if
+you want to back-fill before your first logged session, run the script directly from
+your clone instead.)
 
 Or use the bundled slash command in any session: `/usage-report` (optionally
 `/usage-report 2026-06 200`).
