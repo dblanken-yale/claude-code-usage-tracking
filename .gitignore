@@ -1,0 +1,6 @@
+# Local runtime output lives in ~/.claude/usage, not in the repo.
+# Nothing here should be tracked, but ignore common stray artifacts:
+__pycache__/
+*.pyc
+.DS_Store
+*.csv

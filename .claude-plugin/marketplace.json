@@ -1,0 +1,11 @@
+{
+  "name": "usage-tracker-marketplace",
+  "owner": { "name": "David Blankenship" },
+  "plugins": [
+    {
+      "name": "claude-code-usage-tracker",
+      "source": "./",
+      "description": "Per-turn token usage + estimated API cost logger for ROI analysis and subscription-vs-API comparison."
+    }
+  ]
+}
