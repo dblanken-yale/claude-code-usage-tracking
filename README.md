@@ -57,11 +57,12 @@ into (any path works):
 
 ### Report (easiest — no paths)
 
-Run the bundled slash command in any session:
+Run the bundled slash command in any session (plugin commands are namespaced by the
+plugin name):
 
 ```
-/usage-report
-/usage-report 2026-06 200
+/claude-code-usage-tracker:usage-report
+/claude-code-usage-tracker:usage-report 2026-06 200
 ```
 
 It prints totals, caching savings, per-model and per-project breakdowns, average
@@ -90,9 +91,6 @@ double-counts), backfilling history and sweeping up subagent/team transcripts th
 live in separate files. (`.script_path` is written the first time any hook fires; if
 you want to back-fill before your first logged session, run the script directly from
 your clone instead.)
-
-Or use the bundled slash command in any session: `/usage-report` (optionally
-`/usage-report 2026-06 200`).
 
 ## How it works
 
