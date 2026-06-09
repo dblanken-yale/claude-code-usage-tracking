@@ -22,3 +22,15 @@ subscription-vs-API breakeven verdict.
 Then summarize the output for me: total actual cost, caching savings, the biggest
 models and projects by cost, the 30-day run-rate, and (if a subscription cost was
 given) whether subscription or API wins.
+
+## Pricing
+
+Costs are computed per model VERSION (e.g. Opus 4.1 bills at the old $15/$75, Opus 4.5+
+at $5/$25), using a version-aware baseline table in the script plus a cached overlay
+fetched from Anthropic's public pricing page (`~/.claude/usage/prices.json`). The report
+prints which source it used on the `Prices:` line, and refreshes the cache opportunistically.
+New model prices are also fetched automatically the first time an unseen model is logged.
+
+- `--refresh-prices` — force a refresh of the cached prices now.
+- `--reprice` — recompute the cost columns in `usage.csv` from recorded tokens using current
+  pricing (backs up to `usage.csv.bak` first). Run this after prices change to correct history.
