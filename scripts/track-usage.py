@@ -7,9 +7,11 @@ can analyze spend in Excel and compare API cost against a subscription plan.
 
 Modes:
   (default)        Hook mode. Reads hook JSON from stdin (Stop / SessionEnd),
-                   locates the session transcript, and ingests any new turns.
-  --scan-all       Walk every ~/.claude/projects/*/*.jsonl and ingest. Backfills
-                   history and sweeps up subagent/team transcript files.
+                   locates the session transcript plus its nested subagent
+                   transcripts, and ingests any new turns from all of them.
+  --scan-all       Walk every ~/.claude/projects/**/*.jsonl (recursive) and
+                   ingest. Backfills history and sweeps up nested subagent/team
+                   transcript files.
   --report         Print an ROI rollup from usage.csv (no transcript parsing).
                    Options: --month YYYY-MM, --sub-cost N
   --reprice        Recompute the cost columns in usage.csv from the recorded
@@ -100,7 +102,13 @@ LOCK_PATH = os.path.join(USAGE_DIR, ".lock")
 # Wherever this script ends up installed, it records its own absolute path here so
 # the slash command / CLI can find it without anyone hardcoding an install location.
 SELF_PATH_FILE = os.path.join(USAGE_DIR, ".script_path")
-PROJECTS_GLOB = os.path.expanduser("~/.claude/projects/*/*.jsonl")
+# Recursive so subagent transcripts are swept up too. Claude Code writes the main
+# session at ~/.claude/projects/<slug>/<session-id>.jsonl, but subagent/team turns
+# (spawned at higher effort levels) land in nested dirs like
+# <slug>/<session-id>/subagents/agent-*.jsonl and .../subagents/workflows/wf_*/agent-*.jsonl.
+# `**` matches zero or more directories, so this still covers the top-level files.
+# Safe to over-collect: ingest() dedupes globally on message.id (see .seen_ids).
+PROJECTS_GLOB = os.path.expanduser("~/.claude/projects/**/*.jsonl")
 
 FIELDS = [
     "timestamp", "date", "session_id", "project", "cwd", "model",
@@ -508,6 +516,21 @@ def resolve_transcript(hook):
     return None
 
 
+def session_transcripts(main_path):
+    """Given a session's main transcript path, return it plus any nested subagent
+    transcripts for that same session. Claude Code writes subagent/team turns
+    (spawned at higher effort levels) under <session-id>/subagents/.../*.jsonl,
+    a sibling subtree of the main <session-id>.jsonl file. Sweeping it on every
+    Stop/SessionEnd keeps subagent spend current; ingest() reads only new bytes
+    per file and dedupes globally on message.id, so re-running is cheap and safe."""
+    paths = [main_path]
+    if main_path.endswith(".jsonl"):
+        session_dir = main_path[: -len(".jsonl")]
+        paths.extend(glob.glob(os.path.join(session_dir, "**", "*.jsonl"),
+                               recursive=True))
+    return paths
+
+
 def hook_mode():
     try:
         hook = json.load(sys.stdin)
@@ -515,7 +538,7 @@ def hook_mode():
         return
     path = resolve_transcript(hook)
     if path:
-        ingest([path])
+        ingest(sorted(session_transcripts(path)))
 
 
 def reprice():
@@ -678,7 +701,7 @@ def main():
     elif args.report:
         report(month=args.month, sub_cost=args.sub_cost)
     elif args.scan_all:
-        count = ingest(sorted(glob.glob(PROJECTS_GLOB)))
+        count = ingest(sorted(glob.glob(PROJECTS_GLOB, recursive=True)))
         print(f"Ingested {count} new turn(s) into {CSV_PATH}")
     else:
         hook_mode()
