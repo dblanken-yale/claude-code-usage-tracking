@@ -5,15 +5,24 @@ allowed-tools: Bash(python3:*), Bash(cat:*)
 
 Run the usage tracker's report and present the results to me.
 
-Locate the tracker script without assuming an install path — run the first command
-that succeeds:
+First reconcile any turns not yet logged — the in-progress session, or one that ended
+without a final `Stop`/`SessionEnd` hook (e.g. a crash) — by running `--scan-all`, then
+print the report. `--scan-all` is safe to run every time: it dedupes on message id and
+reads only new bytes, so it never double-counts.
+
+Locate the tracker script without assuming an install path, then run `--scan-all`
+followed by `--report` with the same path. Use the first form whose path resolves
+(`${CLAUDE_PLUGIN_ROOT}` is set when invoked as a plugin command; the `.script_path`
+fallback works anywhere, since the script records its own location on every run):
 
 ```
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/track-usage.py" --scan-all && \
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/track-usage.py" --report
+
+# fallback (run outside a plugin, or if the above path is unset):
+python3 "$(cat ~/.claude/usage/.script_path)" --scan-all && \
 python3 "$(cat ~/.claude/usage/.script_path)" --report
 ```
-
-(The second works because the script records its own location on every run.)
 
 If `$ARGUMENTS` contains a month (e.g. `2026-06`), append `--month <YYYY-MM>`. If it
 contains a dollar amount, append `--sub-cost <N>` so the report includes the

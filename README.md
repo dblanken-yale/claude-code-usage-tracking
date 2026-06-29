@@ -69,6 +69,11 @@ It prints totals, caching savings, per-model and per-project breakdowns, average
 cost per session/turn/day, a 30-day run-rate, and — when you pass a subscription
 price — a subscription-vs-API breakeven verdict.
 
+Before printing, the command runs `--scan-all` to fold in any turns not yet logged —
+the live session, or a session that ended without a final hook — so the report is
+always complete and current. (This is safe and cheap: it dedupes on message id and
+reads only new bytes.)
+
 ### Analyze in a spreadsheet
 
 Open `~/.claude/usage/usage.csv` in Excel / Sheets and pivot on `date`, `model`,
