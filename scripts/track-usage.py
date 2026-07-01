@@ -75,7 +75,11 @@ BASELINE_PRICING = [
     ("opus-4-20250514", 15.00, 75.00),   # Opus 4.0   (dated id)
     ("opus-4-0",        15.00, 75.00),   # Opus 4.0
     ("opus",             5.00, 25.00),   # Opus 4.5+  (family fallback)
-    ("sonnet",           3.00, 15.00),   # all Sonnet 4.x
+    # Sonnet 5's fallback here is its post-2026-08-31 standard rate; the $2/$10
+    # introductory rate in effect until then is only ever available fetched.
+    ("sonnet",           3.00, 15.00),   # all Sonnet 4.x + Sonnet 5 (family fallback)
+    ("fable",           10.00, 50.00),   # Fable 5    (family fallback)
+    ("mythos",          10.00, 50.00),   # Mythos 5   (same pricing as Fable 5)
     ("haiku-3-5",        0.80,  4.00),   # Haiku 3.5
     ("haiku",            1.00,  5.00),   # Haiku 4.5  (family fallback)
 ]
@@ -216,22 +220,52 @@ def apply_cost(row):
 
 def _model_key(text):
     """Map a pricing-table display name to a version-specific id substring, e.g.
-    'Claude Opus 4.8' -> 'opus-4-8', 'Claude Haiku 3.5' -> 'haiku-3-5'.
+    'Claude Opus 4.8' -> 'opus-4-8', 'Claude Sonnet 5' -> 'sonnet-5'.
 
-    A minor version is required: a bare major like 'Claude Opus 4' would yield the
-    over-broad key 'opus-4', which matches 'opus-4-10' etc. Bare-major (x.0) models
-    are covered by the hand-curated baseline instead."""
-    m = re.search(r"Claude\s+(Opus|Sonnet|Haiku)\s+(\d+\.\d+)", text)
+    Anthropic has used both a dotted minor version (Opus, Haiku, and Sonnet through
+    4.6) and a bare integer (Fable, Mythos, and Sonnet from 5 onward) as the current
+    generation's version scheme, so both must match. A bare major version is only
+    safe to treat as a real key once retired/deprecated rows are filtered out by the
+    caller — otherwise e.g. 'Claude Opus 4 (retired...)' would yield the over-broad
+    key 'opus-4', matching 'opus-4-10' etc. at the wrong (old) price."""
+    m = re.search(r"Claude\s+(Opus|Sonnet|Haiku|Fable|Mythos)\s+(\d+(?:\.\d+)?)", text)
     if not m:
         return None
     return f"{m.group(1).lower()}-{m.group(2).replace('.', '-')}"
+
+
+def _row_date_qualifier(line):
+    """Extract a '[through DATE]' / 'starting DATE' qualifier from a pricing-table
+    row, e.g. Anthropic listing a model's introductory rate and its later standard
+    rate as two separate rows for the same model. Returns ('through'|'starting',
+    date) or None."""
+    m = re.search(r"(through|starting)\s+([A-Za-z]+ \d{1,2}, \d{4})", line)
+    if not m:
+        return None
+    try:
+        return m.group(1), datetime.datetime.strptime(m.group(2), "%B %d, %Y").date()
+    except ValueError:
+        return None
+
+
+def _row_is_active(qualifier, today):
+    if qualifier is None:
+        return True
+    kind, date = qualifier
+    return today <= date if kind == "through" else today >= date
 
 
 def _parse_price_table(md):
     """Extract {key: {'input':, 'output':}} from the page's 'Model pricing' table.
 
     Scoped to that one section so the discounted Batch / Fast-mode tables (same
-    model names, different numbers) don't clobber the standard rates."""
+    model names, different numbers) don't clobber the standard rates. Retired and
+    deprecated rows are skipped — their price is superseded and continues to be
+    served by the hand-curated baseline, so keeping them out here avoids the same
+    bare-major-key over-match _model_key warns about. When a model has multiple
+    active rows (e.g. a time-boxed introductory rate alongside its later standard
+    rate), the row whose date qualifier covers today wins, regardless of table
+    order."""
     start = md.find("# Model pricing")
     if start == -1:
         start = md.find("Model pricing")
@@ -239,9 +273,11 @@ def _parse_price_table(md):
     nxt = re.search(r"\n#{1,6} ", section[1:])  # stop at the next heading, any level
     if nxt:
         section = section[: nxt.start() + 1]
-    prices = {}
+    rows_by_key = {}
     for line in section.splitlines():
         if not line.lstrip().startswith("|"):
+            continue
+        if re.search(r"retired|deprecated", line, re.IGNORECASE):
             continue
         key = _model_key(line)
         if not key:
@@ -250,9 +286,16 @@ def _parse_price_table(md):
         if len(amounts) < 2:
             continue
         try:
-            prices[key] = {"input": float(amounts[0]), "output": float(amounts[-1])}
+            price = {"input": float(amounts[0]), "output": float(amounts[-1])}
         except ValueError:
             continue
+        rows_by_key.setdefault(key, []).append((_row_date_qualifier(line), price))
+
+    today = datetime.datetime.now(datetime.timezone.utc).date()
+    prices = {}
+    for key, rows in rows_by_key.items():
+        active = [price for qualifier, price in rows if _row_is_active(qualifier, today)]
+        prices[key] = active[-1] if active else rows[-1][1]
     return prices
 
 

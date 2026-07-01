@@ -108,17 +108,31 @@ file lock. The script always exits 0 and fails quietly, so it can't block a turn
 
 ## Pricing
 
-Rates are defined at the top of `scripts/track-usage.py` (USD per 1M tokens):
+Rates are per model VERSION, not a single flat per-family number — Anthropic has cut
+prices at specific version launches (e.g. Opus 4.1 at $15/$75 vs Opus 4.5+ at $5/$25),
+and can run a temporary introductory rate for a new model before its standard rate
+takes effect (e.g. Sonnet 5). The `BASELINE_PRICING` table at the top of
+`scripts/track-usage.py` is the offline, hand-curated fallback (USD per 1M tokens):
 
 | Model family | Input | Output |
 | --- | --- | --- |
-| Opus | $5.00 | $25.00 |
+| Opus (4.5+) | $5.00 | $25.00 |
 | Sonnet | $3.00 | $15.00 |
-| Haiku | $1.00 | $5.00 |
+| Fable / Mythos | $10.00 | $50.00 |
+| Haiku (4.5) | $1.00 | $5.00 |
+
+You don't need to hand-edit this table when a new model launches — it's merged with a
+cached overlay fetched from Anthropic's public pricing page (`~/.claude/usage/prices.json`),
+which auto-refreshes the first time an unseen model id is logged and opportunistically in
+`--report`. Use `--refresh-prices` to force a refresh now, and `--reprice` to recompute
+`cost_usd`/`cost_uncached_usd` across all of `usage.csv` from current pricing (backs up to
+`usage.csv.bak` first) — the two combine in one invocation. Only touch `BASELINE_PRICING`
+directly for a model the fetch can't parse, or as the last-resort fallback when the cache
+is missing/stale and there's no network.
 
 Cache reads are billed at 0.1x input; cache writes at 1.25x (5-minute) or 2x
-(1-hour). Update the `PRICING` table if Anthropic's prices change. Unknown models
-are still logged (token counts intact) with a blank cost so nothing is mispriced.
+(1-hour). Unknown models are still logged (token counts intact) with a blank cost so
+nothing is mispriced.
 
 ## Privacy
 
