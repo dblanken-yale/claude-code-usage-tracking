@@ -1,7 +1,7 @@
 {
   "name": "claude-code-usage-tracker",
   "description": "Logs per-turn token usage and estimated API cost for every Claude Code session to a CSV for analytics and subscription-vs-API ROI comparison.",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "author": { "name": "David Blankenship" },
   "license": "MIT",
   "keywords": ["usage", "tokens", "cost", "analytics", "hooks", "roi"]
