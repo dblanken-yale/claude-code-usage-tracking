@@ -732,21 +732,29 @@ def main():
     args = parser.parse_args()
 
     record_self()
+    # --refresh-prices and --reprice are meant to be combinable in one invocation
+    # (refresh the cache, then recompute usage.csv from it) — both run if given,
+    # in that order, rather than an if/elif that would silently drop the second.
+    ran_action = False
     if args.refresh_prices:
+        ran_action = True
         count = refresh_prices()
         if count:
             print(f"Refreshed prices for {count} model(s) -> {PRICES_PATH}")
         else:
             print("Price refresh failed (offline or page format changed); "
                   "baseline pricing still in effect.")
-    elif args.reprice:
+    if args.reprice:
+        ran_action = True
         reprice()
-    elif args.report:
+    if args.report:
+        ran_action = True
         report(month=args.month, sub_cost=args.sub_cost)
-    elif args.scan_all:
+    if args.scan_all:
+        ran_action = True
         count = ingest(sorted(glob.glob(PROJECTS_GLOB, recursive=True)))
         print(f"Ingested {count} new turn(s) into {CSV_PATH}")
-    else:
+    if not ran_action:
         hook_mode()
 
 

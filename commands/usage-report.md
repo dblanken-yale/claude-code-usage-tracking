@@ -43,3 +43,5 @@ New model prices are also fetched automatically the first time an unseen model i
 - `--refresh-prices` — force a refresh of the cached prices now.
 - `--reprice` — recompute the cost columns in `usage.csv` from recorded tokens using current
   pricing (backs up to `usage.csv.bak` first). Run this after prices change to correct history.
+- The two combine in one invocation — `--refresh-prices --reprice` refreshes the cache and
+  then recomputes history against it, in that order.
